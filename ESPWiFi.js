@@ -109,7 +109,7 @@ ESPWiFi.prototype.httpGET = function (host, port, path, callback) {
           self.currentCallback = function (data) {
             responseBuffer += data;
             // Проверяем, пришёл ли конец HTTP-запроса
-            if (responseBuffer.includes("OK") || responseBuffer.includes("ERROR")) {
+            if (responseBuffer.includes("OK") || responseBuffer.includes("CLOSED")) {
               // Закрываем соединение
               self.sendAT("AT+CIPCLOSE", 500, function () {
                 callback(responseBuffer);
