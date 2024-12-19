@@ -79,4 +79,62 @@ ESPWiFi.prototype.getIPAddress = function (callback) {
 // Проверка подключения к интернету через TCP-соединение
 ESPWiFi.prototype.checkInternet = function (host, port, callback) {
   var self = this;
-  this.sendAT(`AT+CIPSTART
+  this.sendAT(`AT+CIPSTART="TCP","${host}",${port}`, 1000, function (resp) {
+    if (resp.includes("CONNECT")) {
+      console.log(`Connected to internet via ${host}:${port}`);
+      // Закрываем соединение
+      self.sendAT("AT+CIPCLOSE", 500, function () {
+        if (callback) callback(true);
+      });
+    } else {
+      console.log(`Failed to connect to internet via ${host}:${port}`);
+      if (callback) callback(false);
+    }
+  });
+};
+
+// Метод HTTP GET для получения данных с сервера
+ESPWiFi.prototype.httpGET = function (host, port, path, callback) {
+  var self = this;
+  var request = `HEAD ${path} HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n`;
+  var requestLength = request.length;
+
+  console.log(`Performing HTTP GET to ${host}:${port}${path}`);
+
+  // Устанавливаем TCP-соединение
+  self.sendAT(`AT+CIPSTART="TCP","${host}",${port}`, 2000, function (resp) {
+    if (resp.includes("CONNECT")) {
+      console.log(`TCP connection to ${host}:${port} established.`);
+      // Отправляем команду CIPSEND с длиной запроса
+      self.sendAT(`AT+CIPSEND=${requestLength}`, 500, function (resp) {
+        if (resp.includes(">")) {
+          console.log(`Sending HTTP request:\n${request}`);
+          // Отправляем сам HTTP-запрос
+          self.uart.print(request);
+
+          // Собираем ответ
+          var responseBuffer = "";
+          self.currentCallback = function (data) {
+            responseBuffer += data;
+            // Проверяем, пришёл ли конец HTTP-запроса
+            if (responseBuffer.includes("OK") || responseBuffer.includes("CLOSED")) {
+              console.log("HTTP response received.");
+              // Закрываем соединение
+              self.sendAT("AT+CIPCLOSE", 500, function () {
+                callback(responseBuffer);
+              });
+            }
+          };
+        } else {
+          console.log("Failed to send CIPSEND command.");
+          callback(null);
+        }
+      });
+    } else {
+      console.log(`Failed to connect to ${host}:${port}`);
+      callback(null);
+    }
+  });
+};
+
+exports = ESPWiFi;
