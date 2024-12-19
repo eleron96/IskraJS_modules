@@ -96,6 +96,8 @@ ESPWiFi.prototype.checkInternet = function (host, port, callback) {
 // Метод HTTP GET для получения данных с сервера
 ESPWiFi.prototype.httpGET = function (host, port, path, callback) {
   var self = this;
+  
+  // Формируем HTTP GET запрос
   var request = `GET ${path} HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n`;
   var requestLength = request.length;
 
@@ -106,10 +108,12 @@ ESPWiFi.prototype.httpGET = function (host, port, path, callback) {
   self.sendAT(`AT+CIPSTART="TCP","${host}",${port}`, 2000, function (resp) {
     if (resp.includes("CONNECT")) {
       console.log(`TCP connection to ${host}:${port} established.`);
-      // Отправляем команду CIPSEND с длиной запроса
+      
+      // Отправляем команду CIPSEND с точной длиной запроса
       self.sendAT(`AT+CIPSEND=${requestLength}`, 500, function (resp) {
         if (resp.includes(">")) {
           console.log(`Sending HTTP request:\n${request}`);
+          
           // Отправляем сам HTTP-запрос
           self.uart.print(request);
 
@@ -117,9 +121,11 @@ ESPWiFi.prototype.httpGET = function (host, port, path, callback) {
           var responseBuffer = "";
           self.currentCallback = function (data) {
             responseBuffer += data;
+            
             // Проверяем, пришёл ли конец HTTP-запроса
             if (responseBuffer.includes("OK") || responseBuffer.includes("CLOSED")) {
               console.log("HTTP response received.");
+              
               // Закрываем соединение
               self.sendAT("AT+CIPCLOSE", 500, function () {
                 callback(responseBuffer);
