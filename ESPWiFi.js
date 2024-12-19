@@ -1,3 +1,4 @@
+// ESPWiFi.js
 function ESPWiFi(uartInstance) {
   this.uart = uartInstance;
   this.buffer = "";
@@ -21,7 +22,7 @@ function ESPWiFi(uartInstance) {
   });
 }
 
-// Вспомогательная функция для отправки команд
+// Вспомогательная функция для отправки команд AT
 ESPWiFi.prototype.sendAT = function (command, delayTime, callback) {
   var self = this;
   setTimeout(function () {
@@ -71,18 +72,58 @@ ESPWiFi.prototype.getIPAddress = function (callback) {
   });
 };
 
-// Проверка подключения к интернету (через TCP-соединение)
+// Проверка подключения к интернету через TCP-соединение
 ESPWiFi.prototype.checkInternet = function (host, port, callback) {
   var self = this;
   this.sendAT(`AT+CIPSTART="TCP","${host}",${port}`, 1000, function (resp) {
     if (resp.includes("CONNECT")) {
-      console.log("Internet connection seems working!");
-      if (callback) callback(true);
+      console.log("Connected to " + host + ":" + port);
       // Закрываем соединение
-      self.sendAT("AT+CIPCLOSE", 500, function () {});
+      self.sendAT("AT+CIPCLOSE", 500, function () {
+        if (callback) callback(true);
+      });
     } else {
-      console.log("Failed to connect to the server. Check internet access.");
+      console.log("Failed to connect to " + host + ":" + port);
       if (callback) callback(false);
+    }
+  });
+};
+
+// Метод HTTP GET для получения данных с сервера
+ESPWiFi.prototype.httpGET = function (host, port, path, callback) {
+  var self = this;
+  var request = `HEAD ${path} HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n`;
+  var requestLength = request.length;
+
+  // Устанавливаем TCP-соединение
+  self.sendAT(`AT+CIPSTART="TCP","${host}",${port}`, 2000, function (resp) {
+    if (resp.includes("CONNECT")) {
+      // Отправляем команду CIPSEND с длиной запроса
+      self.sendAT(`AT+CIPSEND=${requestLength}`, 500, function (resp) {
+        if (resp.includes(">")) {
+          // Отправляем сам HTTP-запрос
+          self.uart.print(request);
+
+          // Собираем ответ
+          var responseBuffer = "";
+          self.currentCallback = function (data) {
+            responseBuffer += data;
+            // Проверяем, пришёл ли конец HTTP-запроса
+            if (responseBuffer.includes("OK") || responseBuffer.includes("ERROR")) {
+              // Закрываем соединение
+              self.sendAT("AT+CIPCLOSE", 500, function () {
+                callback(responseBuffer);
+              });
+            }
+          };
+        } else {
+          console.log("Failed to send CIPSEND command.");
+          callback(null);
+        }
+      });
+    } else {
+      console.log("Failed to connect to " + host + ":" + port);
+      callback(null);
     }
   });
 };
