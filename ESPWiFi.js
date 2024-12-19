@@ -96,10 +96,11 @@ ESPWiFi.prototype.checkInternet = function (host, port, callback) {
 // Метод HTTP GET для получения данных с сервера
 ESPWiFi.prototype.httpGET = function (host, port, path, callback) {
   var self = this;
-  var request = `HEAD ${path} HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n`;
+  var request = `GET ${path} HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n`;
   var requestLength = request.length;
 
   console.log(`Performing HTTP GET to ${host}:${port}${path}`);
+  console.log(`HTTP Request (${requestLength} bytes):\n${request}`);
 
   // Устанавливаем TCP-соединение
   self.sendAT(`AT+CIPSTART="TCP","${host}",${port}`, 2000, function (resp) {
